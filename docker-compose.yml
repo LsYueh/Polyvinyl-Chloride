@@ -1,0 +1,9 @@
+services:
+
+  api:
+    build:
+      context: .
+      dockerfile: src/Pvc.Api/Dockerfile
+
+    environment:
+      ASPNETCORE_URLS: http://+:8080
