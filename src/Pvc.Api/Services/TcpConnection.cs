@@ -1,43 +1,28 @@
-using System.Net.Sockets;
-using System.Text;
-
 namespace Pvc.Api.Services;
 
-public class TcpConnection(string id, string host, int port)
+public class TcpConnection(string id, string host, int port) : TcpConnectionBase(id, host, port)
 {
-    public string Id { get; } = id;
-
-    private TcpClient? _client;
-    private NetworkStream? _stream;
-
-    private readonly string _host = host;
-    private readonly int _port = port;
-
-    public bool IsConnected => _client?.Connected ?? false;
-
-    public string Host => _host;
-    public int Port => _port;
-
-    public async Task Connect()
+    protected override Task OnConnectedAsync()
     {
-        _client = new TcpClient();
-        await _client.ConnectAsync(_host, _port);
-
-        _stream = _client.GetStream();
+        Console.WriteLine($"{Id} connected to {Host}:{Port}");
+        return Task.CompletedTask;
     }
 
-    public async Task Send(string message)
+    protected override Task OnDisconnectedAsync()
     {
-        if (_stream == null)
-            throw new Exception("Not connected");
-
-        var data = Encoding.UTF8.GetBytes(message);
-        await _stream.WriteAsync(data);
+        Console.WriteLine($"{Id} disconnected");
+        return Task.CompletedTask;
     }
 
-    public void Disconnect()
+    protected override Task OnReceivedAsync(ReadOnlyMemory<byte> payload)
     {
-        _stream?.Close();
-        _client?.Close();
+        Console.WriteLine($"{Id} received {payload.Length} bytes");
+        return Task.CompletedTask;
+    }
+
+    protected override Task OnErrorAsync(Exception ex)
+    {
+        Console.WriteLine($"{Id} error: {ex.Message}");
+        return Task.CompletedTask;
     }
 }

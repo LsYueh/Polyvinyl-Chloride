@@ -16,7 +16,7 @@ public class TcpConnectionManager
 
         var conn = new TcpConnection(id, host, port);
 
-        await conn.Connect();
+        await conn.ConnectAsync();
 
         _connections[id] = conn;
     }
@@ -26,7 +26,10 @@ public class TcpConnectionManager
         if (!_connections.TryGetValue(id, out var conn))
             throw new Exception("Device not connected");
 
-        await conn.Send(message);
+        // 將 string 轉成 byte[]，這裡使用 UTF-8
+        var payload = System.Text.Encoding.UTF8.GetBytes(message);
+
+        await conn.SendAsync(payload);
     }
 
     public void Disconnect(string id)
@@ -49,7 +52,7 @@ public class TcpConnectionManager
             Id = x.Key,
             Host = x.Value.Host,
             Port = x.Value.Port,
-            Connected = x.Value.IsConnected
+            Connected = x.Value.Connected
         })];
     }
 
@@ -63,7 +66,7 @@ public class TcpConnectionManager
             Id = id,
             Host = conn.Host,
             Port = conn.Port,
-            Connected = conn.IsConnected
+            Connected = conn.Connected
         };
     }
 }
