@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 using Pvc.Api.Health;
-using Pvc.Api.Services;
+using Pvc.Api.Services.Tcp;
 
 namespace Pvc.Api;
 
@@ -42,7 +42,7 @@ class Program
         });
 
         // TCP device manager
-        services.AddSingleton<TcpConnectionManager>();
+        services.AddSingleton<ConnectionManager>();
 
         // Health checks
         services.AddHealthChecks()

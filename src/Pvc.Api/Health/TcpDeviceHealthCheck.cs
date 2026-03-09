@@ -1,11 +1,11 @@
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Pvc.Api.Services;
+using Pvc.Api.Services.Tcp;
 
 namespace Pvc.Api.Health;
 
-public class TcpDeviceHealthCheck(TcpConnectionManager manager) : IHealthCheck
+public class TcpDeviceHealthCheck(ConnectionManager manager) : IHealthCheck
 {
-    private readonly TcpConnectionManager _manager = manager;
+    private readonly ConnectionManager _manager = manager;
 
     public Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,

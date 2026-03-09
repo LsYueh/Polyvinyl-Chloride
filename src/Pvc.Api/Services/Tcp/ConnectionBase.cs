@@ -1,9 +1,9 @@
 using System.Buffers;
 using System.Net.Sockets;
 
-namespace Pvc.Api.Services;
+namespace Pvc.Api.Services.Tcp;
 
-public abstract class TcpConnectionBase(string id, string host, int port) : IDisposable
+public abstract class ConnectionBase(string id, string host, int port) : IDisposable
 {
     private readonly TcpClient _client = new();
     private NetworkStream? _stream;

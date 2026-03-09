@@ -2,11 +2,11 @@ using System.Collections.Concurrent;
 
 using Pvc.Api.Models;
 
-namespace Pvc.Api.Services;
+namespace Pvc.Api.Services.Tcp;
 
-public class TcpConnectionManager
+public class ConnectionManager
 {
-    private readonly ConcurrentDictionary<string, TcpConnection> _connections
+    private readonly ConcurrentDictionary<string, Connection> _connections
         = new();
 
     public async Task Connect(string id, string host, int port)
@@ -14,7 +14,7 @@ public class TcpConnectionManager
         if (_connections.ContainsKey(id))
             throw new Exception("Already connected");
 
-        var conn = new TcpConnection(id, host, port);
+        var conn = new Connection(id, host, port);
 
         await conn.ConnectAsync();
 

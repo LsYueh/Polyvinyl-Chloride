@@ -1,14 +1,14 @@
 using Microsoft.AspNetCore.Mvc;
 
-using Pvc.Api.Services;
+using Pvc.Api.Services.Tcp;
 
 namespace Pvc.Api.Controllers;
 
 [ApiController]
 [Route("api/devices")]
-public class DeviceController(TcpConnectionManager manager) : ControllerBase
+public class DeviceController(ConnectionManager manager) : ControllerBase
 {
-    private readonly TcpConnectionManager _manager = manager;
+    private readonly ConnectionManager _manager = manager;
 
     [HttpGet]
     public IActionResult List()

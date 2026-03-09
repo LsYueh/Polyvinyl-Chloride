@@ -1,6 +1,6 @@
-namespace Pvc.Api.Services;
+namespace Pvc.Api.Services.Tcp;
 
-public class TcpConnection(string id, string host, int port) : TcpConnectionBase(id, host, port)
+public class Connection(string id, string host, int port) : ConnectionBase(id, host, port)
 {
     protected override Task OnConnectedAsync()
     {
