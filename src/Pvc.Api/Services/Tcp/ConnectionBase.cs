@@ -94,22 +94,18 @@ public abstract class ConnectionBase(string id, string host, int port) : IDispos
 
     #region 發送資料
 
-    public async Task SendAsync(ReadOnlyMemory<byte> payload)
+    public async Task SendAsync(SocketPacket packet)
     {
         if (_stream == null)
             throw new InvalidOperationException("Not connected");
 
-        int len = payload.Length;
-
-        byte[] header = new byte[4];
-        BinaryPrimitives.WriteInt32BigEndian(header, len);
+        byte[] buffer = packet.ToBytes();
 
         await _sendLock.WaitAsync();
 
         try
         {
-            await _stream.WriteAsync(header);
-            await _stream.WriteAsync(payload);
+            await _stream.WriteAsync(buffer);
         }
         finally
         {
@@ -183,7 +179,11 @@ public abstract class ConnectionBase(string id, string host, int port) : IDispos
             await Task.Delay(HeartbeatInterval, _cts.Token);
 
             if (_client.Connected)
-                await SendAsync(ReadOnlyMemory<byte>.Empty);
+            {
+                // SLM-030
+                SocketPacket packet = new("11");
+                await SendAsync(packet);
+            }
         }
     }
 

@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 
 using Pvc.Api.Models;
+using Pvc.Api.Network;
 
 namespace Pvc.Api.Services.Tcp;
 
@@ -29,7 +30,9 @@ public class ConnectionManager
         // 將 string 轉成 byte[]，這裡使用 UTF-8
         var payload = System.Text.Encoding.UTF8.GetBytes(message);
 
-        await conn.SendAsync(payload);
+        SocketPacket packet = new("00", payload);
+
+        await conn.SendAsync(packet);
     }
 
     public void Disconnect(string id)

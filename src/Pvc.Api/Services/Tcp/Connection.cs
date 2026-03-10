@@ -20,7 +20,7 @@ public class Connection(string id, string host, int port) : ConnectionBase(id, h
     {
         int len = packet.Payload.HasValue ? packet.Payload.Value.Span.Length : 0;
         
-        Console.WriteLine($"{Id} received {len} bytes");
+        Console.WriteLine($"{Id} received: {packet}");
         return Task.CompletedTask;
     }
 
