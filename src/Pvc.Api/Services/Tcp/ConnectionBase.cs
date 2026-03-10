@@ -181,7 +181,7 @@ public abstract class ConnectionBase(string id, string host, int port) : IDispos
             if (_client.Connected)
             {
                 // SLM-030
-                SocketPacket packet = new("11");
+                var packet = SocketPacket.FromPayload("11", string.Empty);
                 await SendAsync(packet);
             }
         }

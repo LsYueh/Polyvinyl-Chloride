@@ -27,10 +27,8 @@ public class ConnectionManager
         if (!_connections.TryGetValue(id, out var conn))
             throw new Exception("Device not connected");
 
-        // 將 string 轉成 byte[]，這裡使用 UTF-8
-        var payload = System.Text.Encoding.UTF8.GetBytes(message);
-
-        SocketPacket packet = new("00", payload);
+        // SLM-020
+        var packet = SocketPacket.FromPayload("00", message);
 
         await conn.SendAsync(packet);
     }

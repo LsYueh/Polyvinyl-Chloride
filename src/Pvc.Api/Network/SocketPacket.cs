@@ -49,6 +49,19 @@ public sealed class SocketPacket(string controlCode, ReadOnlyMemory<byte>? paylo
         return buffer;
     }
 
+    /// <summary>
+    /// 靜態工廠方法：使用 UTF8 字串作為 payload
+    /// </summary>
+    public static SocketPacket FromPayload(string controlCode, string? textPayload = null)
+    {        
+        ReadOnlyMemory<byte>? payload = null;
+
+        if (!string.IsNullOrEmpty(textPayload))
+            payload = Encoding.UTF8.GetBytes(textPayload).AsMemory();
+        
+        return new SocketPacket(controlCode, payload);
+    }
+
     public override string ToString()
     {
         string payloadStr;
