@@ -1,4 +1,4 @@
-using System.Buffers;
+using System.Buffers.Binary;
 using System.Net.Sockets;
 
 namespace Pvc.Api.Services.Tcp;
@@ -11,7 +11,6 @@ public abstract class ConnectionBase(string id, string host, int port) : IDispos
     private readonly CancellationTokenSource _cts = new();
     private readonly SemaphoreSlim _sendLock = new(1, 1);
     private readonly byte[] _recvBuffer = new byte[8192];
-    private readonly ArrayPool<byte> _pool = ArrayPool<byte>.Shared;
 
     private int _buffered;
 
@@ -100,27 +99,20 @@ public abstract class ConnectionBase(string id, string host, int port) : IDispos
             throw new InvalidOperationException("Not connected");
 
         int len = payload.Length;
-        
-        byte[] buffer = _pool.Rent(len + 4);
 
-        // 大端封包長度
-        buffer[0] = (byte)(len >> 24);
-        buffer[1] = (byte)(len >> 16);
-        buffer[2] = (byte)(len >> 8);
-        buffer[3] = (byte)len;
-
-        payload.CopyTo(buffer.AsMemory(4));
+        byte[] header = new byte[4];
+        BinaryPrimitives.WriteInt32BigEndian(header, len);
 
         await _sendLock.WaitAsync();
 
         try
         {
-            await _stream.WriteAsync(buffer.AsMemory(0, len + 4));
+            await _stream.WriteAsync(header);
+            await _stream.WriteAsync(payload);
         }
         finally
         {
             _sendLock.Release();
-            _pool.Return(buffer);
         }
     }
 
@@ -148,18 +140,13 @@ public abstract class ConnectionBase(string id, string host, int port) : IDispos
                 {
                     if (_buffered - offset < 4) break;
 
-                    int len =
-                        (_recvBuffer[offset] << 24) |
-                        (_recvBuffer[offset + 1] << 16) |
-                        (_recvBuffer[offset + 2] << 8) |
-                        (_recvBuffer[offset + 3]);
+                    int len = BinaryPrimitives.ReadInt32BigEndian(_recvBuffer.AsSpan(offset, 4));
 
                     if (_buffered - offset - 4 < len) break;
 
-                    var msg = _pool.Rent(len);
-                    Buffer.BlockCopy(_recvBuffer, offset + 4, msg, 0, len);
-                    await OnReceivedAsync(msg.AsMemory(0, len));
-                    _pool.Return(msg);
+                    var msg = _recvBuffer.AsMemory(offset + 4, len);
+
+                    await OnReceivedAsync(msg);
 
                     offset += 4 + len;
                 }
