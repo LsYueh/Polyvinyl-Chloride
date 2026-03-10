@@ -1,5 +1,4 @@
 using System.Buffers.Binary;
-using System.Text;
 
 namespace Pvc.Api.Network;
 
@@ -29,34 +28,46 @@ public static class SocketPacketParser
         consumed = 0;
         packet = null;
 
-        // 最小長度 = Header(2) + Control(2) + Length(2) + Trailer(2) = 8
-        if (buffer.Length < 8)
+        if (buffer.Length < SocketProtocol.MinPacketSize)
             return false;
 
-        ushort header = BinaryPrimitives.ReadUInt16BigEndian(buffer);
-        if (header != SocketPacket.HeaderCode)
+        // Header
+        ushort header = BinaryPrimitives.ReadUInt16BigEndian(
+            buffer[..SocketProtocol.HeaderSize]);
+
+        if (header != SocketProtocol.HeaderCode)
             throw new InvalidDataException("Invalid header");
 
-        string control = Encoding.ASCII.GetString(buffer.Slice(2, 2));
+        // ControlCode
+        var control = buffer.Slice(
+            SocketProtocol.HeaderSize,
+            SocketProtocol.ControlSize).ToArray();
 
-        ushort len = BinaryPrimitives.ReadUInt16BigEndian(buffer.Slice(4, 2));
+        // Length
+        ushort len = BinaryPrimitives.ReadUInt16BigEndian(
+            buffer.Slice(SocketProtocol.HeaderSize + SocketProtocol.ControlSize, SocketProtocol.LengthSize));
 
         // 檢查安全上限
         if (len > MaxPacketSize)
             throw new InvalidDataException($"Packet length {len} exceeds MaxPacketSize {MaxPacketSize}");
 
-        int packetSize = 6 + len + 2;
+        int packetSize = SocketProtocol.PrefixSize + len + SocketProtocol.TrailerSize;
 
         if (buffer.Length < packetSize)
             return false; // 等待更多資料
 
-        ushort trailer = BinaryPrimitives.ReadUInt16BigEndian(buffer.Slice(6 + len, 2));
-        if (trailer != SocketPacket.TrailerCode)
+        // Trailer
+        ushort trailer = BinaryPrimitives.ReadUInt16BigEndian(
+            buffer.Slice(SocketProtocol.PrefixSize + len, SocketProtocol.TrailerSize));
+        
+        if (trailer != SocketProtocol.TrailerCode)
             throw new InvalidDataException("Invalid trailer");
 
-        ReadOnlyMemory<byte>? payload = len > 0 
-            ? buffer.Slice(6, len).ToArray() 
-            : null;
+        // Payload
+        ReadOnlyMemory<byte>? payload = null;
+
+        if (len > 0 )
+            payload = buffer.Slice(SocketProtocol.PrefixSize, len).ToArray();
 
         packet = new SocketPacket(control, payload);
 

@@ -8,43 +8,49 @@ namespace Pvc.Api.Network;
 /// </summary>
 /// <param name="controlCode"></param>
 /// <param name="payload"></param>
-public sealed class SocketPacket(string controlCode, ReadOnlyMemory<byte>? payload = null)
+public sealed class SocketPacket
 {
-    public const ushort HeaderCode = 0xFEFE;
-    public const ushort TrailerCode = 0xEFEF;
+    public ReadOnlyMemory<byte> ControlCode { get; }
 
-    public string ControlCode { get; } = controlCode ?? throw new ArgumentNullException(nameof(controlCode));
-
-    public ReadOnlyMemory<byte>? Payload { get; } = payload;
+    public ReadOnlyMemory<byte>? Payload { get; }
 
     public ushort Length => (ushort)(Payload?.Length ?? 0);
+
+    public int PacketSize => SocketProtocol.PrefixSize + Length + SocketProtocol.TrailerSize;
+
+    public SocketPacket(ReadOnlyMemory<byte> controlCode, ReadOnlyMemory<byte>? payload = null)
+    {
+        if (controlCode.Length != 2)
+            throw new ArgumentException("ControlCode must be 2 bytes", nameof(controlCode));
+
+        ControlCode = controlCode;
+        Payload = payload;
+    }
 
     public byte[] ToBytes()
     {
         int payloadLength = Length;
-        byte[] buffer = new byte[6 + payloadLength + 2];
+        byte[] buffer = new byte[SocketProtocol.PrefixSize + payloadLength + SocketProtocol.TrailerSize];
 
         // Header
-        BinaryPrimitives.WriteUInt16BigEndian(buffer.AsSpan(0, 2), HeaderCode);
+        BinaryPrimitives.WriteUInt16BigEndian(buffer.AsSpan(0, SocketProtocol.HeaderSize), SocketProtocol.HeaderCode);
 
         // ControlCode
-        byte[] controlBytes = Encoding.ASCII.GetBytes(ControlCode);
-        if (controlBytes.Length != 2)
-            throw new InvalidDataException("ControlCode must be 2 bytes");
-
-        controlBytes.CopyTo(buffer, 2);
+        ControlCode.Span.CopyTo(buffer.AsSpan(SocketProtocol.HeaderSize, SocketProtocol.ControlSize));
 
         // Length
-        BinaryPrimitives.WriteUInt16BigEndian(buffer.AsSpan(4, 2), (ushort)payloadLength);
+        BinaryPrimitives.WriteUInt16BigEndian(
+            buffer.AsSpan(SocketProtocol.HeaderSize + SocketProtocol.ControlSize, SocketProtocol.LengthSize), (ushort)payloadLength);
 
         // Payload
         if (payloadLength > 0 && Payload.HasValue)
         {
-            Payload.Value.CopyTo(buffer.AsMemory(6, payloadLength));
+            Payload.Value.CopyTo(buffer.AsMemory(SocketProtocol.PrefixSize, payloadLength));
         }
 
         // Trailer
-        BinaryPrimitives.WriteUInt16BigEndian(buffer.AsSpan(6 + payloadLength, 2), TrailerCode);
+        BinaryPrimitives.WriteUInt16BigEndian(
+            buffer.AsSpan(SocketProtocol.PrefixSize + payloadLength, SocketProtocol.TrailerSize), SocketProtocol.TrailerCode);
 
         return buffer;
     }
@@ -54,12 +60,18 @@ public sealed class SocketPacket(string controlCode, ReadOnlyMemory<byte>? paylo
     /// </summary>
     public static SocketPacket FromPayload(string controlCode, string? textPayload = null)
     {        
+        if (controlCode.Length != 2)
+            throw new ArgumentException("ControlCode must be 2 characters", nameof(controlCode));
+
+        
+        ReadOnlyMemory<byte> controlBytes = Encoding.ASCII.GetBytes(controlCode);
+
         ReadOnlyMemory<byte>? payload = null;
 
         if (!string.IsNullOrEmpty(textPayload))
             payload = Encoding.UTF8.GetBytes(textPayload).AsMemory();
         
-        return new SocketPacket(controlCode, payload);
+        return new SocketPacket(controlBytes, payload);
     }
 
     public override string ToString()
@@ -79,6 +91,6 @@ public sealed class SocketPacket(string controlCode, ReadOnlyMemory<byte>? paylo
                 payloadStr += "...";
         }
 
-        return $"SocketPacket {{ Header=0x{HeaderCode:X4}, Control={ControlCode}, Length={Length}, Payload={payloadStr}, Trailer=0x{TrailerCode:X4} }}";
+        return $"SocketPacket {{ Header=0x{SocketProtocol.HeaderCode:X4}, Control={ControlCode}, Length={Length}, Payload={payloadStr}, Trailer=0x{SocketProtocol.TrailerCode:X4} }}";
     }
 }
