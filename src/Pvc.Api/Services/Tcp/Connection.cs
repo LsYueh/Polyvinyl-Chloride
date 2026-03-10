@@ -1,3 +1,5 @@
+using Pvc.Api.Network;
+
 namespace Pvc.Api.Services.Tcp;
 
 public class Connection(string id, string host, int port) : ConnectionBase(id, host, port)
@@ -14,9 +16,11 @@ public class Connection(string id, string host, int port) : ConnectionBase(id, h
         return Task.CompletedTask;
     }
 
-    protected override Task OnReceivedAsync(ReadOnlyMemory<byte> payload)
+    protected override Task OnReceivedAsync(SocketPacket packet)
     {
-        Console.WriteLine($"{Id} received {payload.Length} bytes");
+        int len = packet.Payload.HasValue ? packet.Payload.Value.Span.Length : 0;
+        
+        Console.WriteLine($"{Id} received {len} bytes");
         return Task.CompletedTask;
     }
 

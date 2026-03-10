@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Net.Sockets;
+using Pvc.Api.Network;
 
 namespace Pvc.Api.Services.Tcp;
 
@@ -40,7 +41,7 @@ public abstract class ConnectionBase(string id, string host, int port) : IDispos
     /// <summary>
     /// 收到資料
     /// </summary>
-    protected virtual Task OnReceivedAsync(ReadOnlyMemory<byte> payload) => Task.CompletedTask;
+    protected virtual Task OnReceivedAsync(SocketPacket packet) => Task.CompletedTask;
 
     /// <summary>
     /// 發生例外
@@ -138,17 +139,15 @@ public abstract class ConnectionBase(string id, string host, int port) : IDispos
 
                 while (true)
                 {
-                    if (_buffered - offset < 4) break;
+                    if (!SocketPacketParser.TryParse(
+                        _recvBuffer.AsSpan(offset, _buffered - offset),
+                        out int consumed,
+                        out var packet))
+                        break;
 
-                    int len = BinaryPrimitives.ReadInt32BigEndian(_recvBuffer.AsSpan(offset, 4));
+                    await OnReceivedAsync(packet!);
 
-                    if (_buffered - offset - 4 < len) break;
-
-                    var msg = _recvBuffer.AsMemory(offset + 4, len);
-
-                    await OnReceivedAsync(msg);
-
-                    offset += 4 + len;
+                    offset += consumed;
                 }
 
                 if (offset > 0)
