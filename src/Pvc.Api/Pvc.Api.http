@@ -1,6 +1,0 @@
-@Pvc.Api_HostAddress = http://localhost:5197
-
-GET {{Pvc.Api_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###

@@ -1,55 +1,40 @@
-# =========================
-# Build outputs
-# =========================
-bin/
-obj/
-*.dll
-*.exe
-*.pdb
-*.app
+# Dependencies
+node_modules/
+
+# Nuxt
+.nuxt/
+.output/
+
+# Build
+dist/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Logs
 *.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
 
-# =========================
-# VS Code
-# =========================
-# .vscode/
-
-# =========================
-# User / OS files
-# =========================
-*.user
-*.suo
-*.userprefs
-*.DS_Store
+# OS
+.DS_Store
 Thumbs.db
 
-# =========================
-# NuGet
-# =========================
-*.nupkg
-*.snupkg
-.nuget/
-
-# =========================
-# Rider/IDEA (如果你可能使用)
-# =========================
+# IDE
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
 .idea/
 
-# =========================
-# Dotnet local tool / temp
-# =========================
-*.vs/
-*.vsconfig
-*.dotCover
-TestResults/
+# TypeScript
+*.tsbuildinfo
+
+# Test / Coverage
 coverage/
 
-# =========================
-# BenchmarkDotNet
-# =========================
-BenchmarkDotNet.Artifacts
-
-# =========================
-# drawio
-# =========================
-*.bkp
+# Temporary files
+*.tmp
+*.temp
