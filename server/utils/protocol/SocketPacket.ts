@@ -6,7 +6,7 @@ import { SocketProtocol } from './SocketProtocol';
  */
 export class SocketPacket {
   readonly controlCode: Buffer;
-  readonly payload?: Buffer;
+  readonly payload?: Buffer | null;
 
   get length(): number {
     return this.payload?.length ?? 0;
@@ -23,7 +23,7 @@ export class SocketPacket {
    * @param controlCode 
    * @param payload 
    */
-  constructor(controlCode: Buffer, payload?: Buffer) {
+  constructor(controlCode: Buffer, payload?: Buffer | null) {
     if (controlCode.length !== 2) {
       throw new Error('ControlCode must be 2 bytes');
     }
@@ -75,7 +75,7 @@ export class SocketPacket {
    */
   static fromPayload(
     controlCode: string,
-    textPayload?: string
+    textPayload?: string | null
   ): SocketPacket {
     if (controlCode.length !== 2) {
       throw new Error('ControlCode must be 2 characters');
@@ -85,7 +85,7 @@ export class SocketPacket {
 
     const payload = textPayload
       ? Buffer.from(textPayload, 'utf8')
-      : undefined;
+      : null;
 
     return new SocketPacket(controlBytes, payload);
   }

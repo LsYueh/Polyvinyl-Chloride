@@ -60,7 +60,7 @@ export class SocketPacketParser {
     }
 
     // Payload
-    let payload: Buffer | undefined;
+    let payload: Buffer | null = null;
 
     if (len > 0) {
       payload = Buffer.from(
