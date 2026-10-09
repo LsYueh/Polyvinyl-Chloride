@@ -25,14 +25,14 @@ describe('SocketPacket', () => {
     expect(bytes[1]).toBe(0xfe)
 
     // Control
-    expect(bytes.slice(2, 4)).toEqual(controlCode)
+    expect(bytes.subarray(2, 4)).toEqual(controlCode)
 
     // Length (Big Endian)
     expect(bytes[4]).toBe(0)
     expect(bytes[5]).toBe(5)
 
     // Payload
-    expect(bytes.slice(6, 11)).toEqual(payload)
+    expect(bytes.subarray(6, 11)).toEqual(payload)
 
     // Trailer
     expect(bytes[11]).toBe(0xef)
@@ -58,7 +58,7 @@ describe('SocketPacket', () => {
     expect(header).toBe(SocketProtocol.HEADER_CODE)
 
     // Control code
-    expect(bytes.slice(2, 4)).toEqual(controlCode)
+    expect(bytes.subarray(2, 4)).toEqual(controlCode)
 
     // Length
     const view = new DataView(
@@ -71,7 +71,7 @@ describe('SocketPacket', () => {
     expect(length).toBe(payload.length)
 
     // Payload
-    expect(bytes.slice(6, 6 + payload.length)).toEqual(payload)
+    expect(bytes.subarray(6, 6 + payload.length)).toEqual(payload)
 
     // Trailer
     const trailer = view.getUint16(6 + payload.length, false)
@@ -113,7 +113,7 @@ describe('SocketPacket', () => {
     expect(view.getUint16(0, false)).toBe(SocketProtocol.HEADER_CODE)
 
     // Control code
-    expect(bytes.slice(2, 4)).toEqual(controlCode)
+    expect(bytes.subarray(2, 4)).toEqual(controlCode)
 
     // Length
     expect(view.getUint16(4, false)).toBe(0)
