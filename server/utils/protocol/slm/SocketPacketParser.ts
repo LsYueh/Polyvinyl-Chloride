@@ -1,6 +1,11 @@
 import { SocketProtocol } from './SocketProtocol'
 import { SocketPacket } from './SocketPacket'
 
+export interface ParsedPacket {
+  consumed: number;
+  packet: SocketPacket;
+}
+
 /**
  * Socket Level Message (SLM) Parser
  */
@@ -16,10 +21,7 @@ export class SocketPacketParser {
    * @returns null when the buffer does not contain a complete packet.
    * @throws Error when the packet format is invalid.
    */
-  static tryParse(buffer: Buffer): {
-    consumed: number
-    packet: SocketPacket
-  } | null {
+  static tryParse(buffer: Buffer): ParsedPacket | null {
     if (buffer.length < SocketProtocol.MIN_PACKET_SIZE) {
       return null;
     }
