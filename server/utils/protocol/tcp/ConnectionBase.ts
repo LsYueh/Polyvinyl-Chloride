@@ -17,9 +17,18 @@ export abstract class ConnectionBase {
   private reconnectTimer?: ReturnType<typeof setTimeout>;
   private heartbeatTimer?: ReturnType<typeof setTimeout>;
 
-  private stopped    = false;
+  private stopped = false;
   private connecting = false;
-  private connected  = false;
+  private connected = false;
+
+  /**
+   * 保存正在進行的連線 Promise，供重複呼叫共用。
+   */
+  private connectPromise?: Promise<void>;
+  /**
+   * 保存 Promise 的拒絕函式，讓 disconnect() 能取消等待中的連線。
+   */
+  private rejectConnect?: (error: Error) => void;
 
   private receiveBuffer = Buffer.alloc(0);
 
@@ -37,8 +46,8 @@ export abstract class ConnectionBase {
     options: ConnectionOptions = {},
     private readonly socketFactory: SocketFactory = defaultSocketFactory,
   ) {
-    this.autoReconnect     = options.autoReconnect     ?? true;
-    this.reconnectDelay    = options.reconnectDelay    ?? 5000;
+    this.autoReconnect = options.autoReconnect ?? true;
+    this.reconnectDelay = options.reconnectDelay ?? 5000;
     this.heartbeatInterval = options.heartbeatInterval ?? 45000;
   }
 
@@ -63,69 +72,101 @@ export abstract class ConnectionBase {
 
   public async connectAsync(): Promise<void> {
     if (this.stopped) {
-      throw new Error('Connection has been stopped.');
+      return Promise.reject(
+        new Error('Connection has been stopped.'),
+      );
     }
 
-    if (this.isConnected || this.connecting) {
-      return;
+    if (this.isConnected) {
+      return Promise.resolve();
+    }
+
+    if (this.connectPromise) {
+      return this.connectPromise;
     }
 
     this.connecting = true;
 
     const socket = this.socketFactory();
     this.socket = socket;
-
     this.receiveBuffer = Buffer.alloc(0);
 
     let wasConnected = false;
 
-    socket.on('connect', () => {
-      if (this.socket !== socket || this.stopped) {
-        socket.destroy();
-        return;
-      }
+    const promise = new Promise<void>((resolve, reject) => {
+      this.rejectConnect = reject;
 
-      wasConnected = true;
-      this.connected = true;
-      this.connecting = false;
+      socket.once('connect', () => {
+        if (this.socket !== socket || this.stopped) {
+          socket.destroy();
+          return;
+        }
 
-      void this.runHook(() => this.onConnected());
-      this.scheduleHeartbeat();
-    });
+        wasConnected = true;
+        this.connected = true;
+        this.connecting = false;
+        this.connectPromise = undefined;
+        this.rejectConnect = undefined;
 
-    socket.on('data', (data: Buffer) => {
-      if (this.socket !== socket) return;
+        void this.runHook(() => this.onConnected());
+        this.scheduleHeartbeat();
 
-      void this.handleData(data);
-    });
+        resolve();
+      });
 
-    socket.on('error', (error: Error) => {
-      void this.runHook(() => this.onError(error));
-    });
+      socket.on('data', (data: Buffer) => {
+        if (this.socket !== socket) return;
 
-    socket.on('close', () => {
-      if (this.socket !== socket) return;
+        void this.handleData(data);
+      });
 
-      this.socket = undefined;
-      this.connected = false;
-      this.connecting = false;
+      socket.on('error', (error: Error) => {
+        void this.runHook(() => this.onError(error));
 
-      this.clearHeartbeat();
-      this.receiveBuffer = Buffer.alloc(0);
+        if (!wasConnected) {
+          this.failConnecting(socket, error);
+        }
+      });
 
-      if (wasConnected) {
+      socket.on('close', () => {
+        if (this.socket !== socket) return;
+
+        if (!wasConnected) {
+          this.failConnecting(
+            socket,
+            new Error('Connection closed before connecting.'),
+          );
+          return;
+        }
+
+        this.socket = undefined;
+        this.connected = false;
+        this.connecting = false;
+
+        this.clearHeartbeat();
+        this.receiveBuffer = Buffer.alloc(0);
+
         void this.runHook(() => this.onDisconnected());
-      }
 
-      if (!this.stopped && this.autoReconnect) {
-        this.scheduleReconnect();
-      }
+        if (!this.stopped && this.autoReconnect) {
+          this.scheduleReconnect();
+        }
+      });
     });
 
-    socket.connect({
-      host: this.host,
-      port: this.port,
-    });
+    this.connectPromise = promise;
+
+    try {
+      socket.connect({
+        host: this.host,
+        port: this.port,
+      });
+    } catch (error) {
+      this.failConnecting(socket, this.toError(error));
+      socket.destroy();
+    }
+
+    return promise;
   }
 
   public disconnect(): void {
@@ -137,10 +178,18 @@ export abstract class ConnectionBase {
     this.clearHeartbeat();
 
     const socket = this.socket;
+
     this.socket = undefined;
     this.connected = false;
     this.connecting = false;
     this.receiveBuffer = Buffer.alloc(0);
+
+    this.connectPromise = undefined;
+
+    const reject = this.rejectConnect;
+    this.rejectConnect = undefined;
+
+    reject?.(new Error('Connection was cancelled.'));
 
     socket?.destroy();
   }
@@ -296,5 +345,29 @@ export abstract class ConnectionBase {
     return error instanceof Error
       ? error
       : new Error(String(error));
+  }
+
+  /**
+   * 統一連線失敗的清理方式
+   * @param socket 
+   * @param error 
+   * @returns 
+   */
+  private failConnecting(
+    socket: Socket,
+    error: Error,
+  ): void {
+    if (this.socket !== socket) return;
+
+    this.socket         = undefined;
+    this.connecting     = false;
+    this.connected      = false;
+    this.connectPromise = undefined;
+    this.receiveBuffer  = Buffer.alloc(0);
+
+    const reject = this.rejectConnect;
+    this.rejectConnect = undefined;
+
+    reject?.(error);
   }
 }
