@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { SocketPacket } from '#server/utils/protocol/SocketPacket'
-import { SocketPacketParser } from '#server/utils/protocol/SocketPacketParser'
-import { SocketProtocol } from '#server/utils/protocol/SocketProtocol'
+import { SocketPacket } from '#server/utils/protocol/slm/SocketPacket'
+import { SocketPacketParser } from '#server/utils/protocol/slm/SocketPacketParser'
 
 describe('SocketPacketParserMultiPacket', () => {
   it('TryParse_MultiplePacketsWithPartialEnd_ShouldParseCorrectly', () => {

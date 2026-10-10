@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { SocketPacket } from '#server/utils/protocol/SocketPacket'
-import { SocketPacketParser } from '#server/utils/protocol/SocketPacketParser'
+import { SocketPacket } from '#server/utils/protocol/slm/SocketPacket'
+import { SocketPacketParser } from '#server/utils/protocol/slm/SocketPacketParser'
 
 describe('SocketPacketParser', () => {
   it('TryParse_ValidPacket_ShouldReturnTrue', () => {

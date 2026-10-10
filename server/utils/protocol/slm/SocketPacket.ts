@@ -5,7 +5,18 @@ import { SocketProtocol } from './SocketProtocol';
  * Socket Level Message (SLM)
  */
 export class SocketPacket {
+  /**
+   * Control Code
+   * - 00: 代表TMP訊息
+   * - 10: 代表接受Socket訊息
+   * - 11: 代表Heartbeat
+   * - (其他): 代表錯誤訊息
+   */
   readonly controlCode: Buffer;
+  
+  /**
+   * (TMP 訊息內容)
+   */
   readonly payload?: Buffer | null;
 
   get length(): number {
