@@ -8,7 +8,7 @@ export interface DeviceStatus {
   connected: boolean;
 }
 
-export class TcpConnectionManager {
+export class ConnectionManager {
   private readonly _connections = new Map<string, Connection>();
 
   public register(
