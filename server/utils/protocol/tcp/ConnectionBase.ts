@@ -13,14 +13,12 @@ export interface ConnectionOptions {
 }
 
 export abstract class ConnectionBase {
-  private socket?: Socket;
   private reconnectTimer?: ReturnType<typeof setTimeout>;
   private heartbeatTimer?: ReturnType<typeof setTimeout>;
 
+  private socket?: Socket;
   private stopped = false;
-  private connecting = false;
   private connected = false;
-
   /**
    * 保存正在進行的連線 Promise，供重複呼叫共用。
    */
@@ -29,7 +27,6 @@ export abstract class ConnectionBase {
    * 保存 Promise 的拒絕函式，讓 disconnect() 能取消等待中的連線。
    */
   private rejectConnect?: (error: Error) => void;
-
   private receiveBuffer = Buffer.alloc(0);
 
   private sendQueue: Promise<void> = Promise.resolve();
@@ -85,8 +82,6 @@ export abstract class ConnectionBase {
       return this.connectPromise;
     }
 
-    this.connecting = true;
-
     const socket = this.socketFactory();
     this.socket = socket;
     this.receiveBuffer = Buffer.alloc(0);
@@ -104,7 +99,6 @@ export abstract class ConnectionBase {
 
         wasConnected = true;
         this.connected = true;
-        this.connecting = false;
         this.connectPromise = undefined;
         this.rejectConnect = undefined;
 
@@ -141,7 +135,6 @@ export abstract class ConnectionBase {
 
         this.socket = undefined;
         this.connected = false;
-        this.connecting = false;
 
         this.clearHeartbeat();
         this.receiveBuffer = Buffer.alloc(0);
@@ -178,19 +171,23 @@ export abstract class ConnectionBase {
     this.clearHeartbeat();
 
     const socket = this.socket;
-
-    this.socket = undefined;
-    this.connected = false;
-    this.connecting = false;
-    this.receiveBuffer = Buffer.alloc(0);
-
-    this.connectPromise = undefined;
-
     const reject = this.rejectConnect;
+
+    // 清除目前連線狀態
+    if (socket) {
+      this.clearConnectionState(socket);
+    } else {
+      this.connected = false;
+      this.connectPromise = undefined;
+      this.receiveBuffer = Buffer.alloc(0);
+    }
+
     this.rejectConnect = undefined;
 
+    // 若連線尚未完成，取消等待中的 Promise
     reject?.(new Error('Connection was cancelled.'));
 
+    // 關閉 Socket
     socket?.destroy();
   }
 
@@ -359,15 +356,20 @@ export abstract class ConnectionBase {
   ): void {
     if (this.socket !== socket) return;
 
-    this.socket         = undefined;
-    this.connecting     = false;
-    this.connected      = false;
-    this.connectPromise = undefined;
-    this.receiveBuffer  = Buffer.alloc(0);
+    this.clearConnectionState(socket);
 
     const reject = this.rejectConnect;
     this.rejectConnect = undefined;
 
     reject?.(error);
+  }
+
+  private clearConnectionState(socket: Socket): void {
+    if (this.socket !== socket) return;
+
+    this.socket = undefined;
+    this.connected = false;
+    this.connectPromise = undefined;
+    this.receiveBuffer = Buffer.alloc(0);
   }
 }
