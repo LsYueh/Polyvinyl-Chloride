@@ -1,6 +1,10 @@
-import net from 'node:net';
+import { Socket } from 'node:net';
 import { SocketPacket } from '#server/utils/protocol/slm/SocketPacket';
 import { ParsedPacket, SocketPacketParser } from '#server/utils/protocol/slm/SocketPacketParser'
+
+export type SocketFactory = () => Socket;
+
+const defaultSocketFactory: SocketFactory = () => new Socket();
 
 export interface ConnectionOptions {
   autoReconnect?: boolean;
@@ -9,7 +13,7 @@ export interface ConnectionOptions {
 }
 
 export abstract class ConnectionBase {
-  private socket?: net.Socket;
+  private socket?: Socket;
   private reconnectTimer?: ReturnType<typeof setTimeout>;
   private heartbeatTimer?: ReturnType<typeof setTimeout>;
 
@@ -26,20 +30,13 @@ export abstract class ConnectionBase {
   public reconnectDelay: number;
   public heartbeatInterval: number;
 
-  public readonly id: string;
-  public readonly host: string;
-  public readonly port: number;
-
   protected constructor(
-    id: string,
-    host: string,
-    port: number,
+    public readonly id: string,
+    public readonly host: string,
+    public readonly port: number,
     options: ConnectionOptions = {},
+    private readonly socketFactory: SocketFactory = defaultSocketFactory,
   ) {
-    this.id   = id;
-    this.host = host;
-    this.port = port;
-
     this.autoReconnect     = options.autoReconnect     ?? true;
     this.reconnectDelay    = options.reconnectDelay    ?? 5000;
     this.heartbeatInterval = options.heartbeatInterval ?? 45000;
@@ -75,7 +72,7 @@ export abstract class ConnectionBase {
 
     this.connecting = true;
 
-    const socket = new net.Socket();
+    const socket = this.socketFactory();
     this.socket = socket;
 
     this.receiveBuffer = Buffer.alloc(0);
