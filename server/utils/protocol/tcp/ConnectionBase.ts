@@ -27,6 +27,8 @@ export abstract class ConnectionBase {
    * 保存 Promise 的拒絕函式，讓 disconnect() 能取消等待中的連線。
    */
   private rejectConnect?: (error: Error) => void;
+
+  private receiveQueue: Promise<void> = Promise.resolve();
   private receiveBuffer = Buffer.alloc(0);
 
   private sendQueue: Promise<void> = Promise.resolve();
@@ -109,37 +111,43 @@ export abstract class ConnectionBase {
       });
 
       socket.on('data', (data: Buffer) => {
-        if (this.socket !== socket) return;
-
-        void this.handleData(data);
+        this.receiveQueue = this.receiveQueue
+          .then(() => this.handleData(socket, data))
+          .catch((error: unknown) =>
+            this.runHook(() => this.onError(this.toError(error))),
+          );
       });
 
       socket.on('error', (error: Error) => {
         void this.runHook(() => this.onError(error));
 
-        if (!wasConnected) {
-          this.failConnecting(socket, error);
+        // 連線尚未成功時拒絕 Promise
+        if (!wasConnected && this.socket === socket) {
+          const reject = this.rejectConnect;
+          this.rejectConnect = undefined;
+
+          reject?.(error);
         }
+
+        socket.destroy();
       });
 
       socket.on('close', () => {
         if (this.socket !== socket) return;
 
         if (!wasConnected) {
-          this.failConnecting(
-            socket,
+          this.failConnecting(socket,
             new Error('Connection closed before connecting.'),
           );
-          return;
+        } else {
+          this.socket = undefined;
+          this.connected = false;
+
+          this.clearHeartbeat();
+          this.receiveBuffer = Buffer.alloc(0);
+
+          void this.runHook(() => this.onDisconnected());
         }
-
-        this.socket = undefined;
-        this.connected = false;
-
-        this.clearHeartbeat();
-        this.receiveBuffer = Buffer.alloc(0);
-
-        void this.runHook(() => this.onDisconnected());
 
         if (!this.stopped && this.autoReconnect) {
           this.scheduleReconnect();
@@ -157,6 +165,10 @@ export abstract class ConnectionBase {
     } catch (error) {
       this.failConnecting(socket, this.toError(error));
       socket.destroy();
+
+      if (!this.stopped && this.autoReconnect) {
+        this.scheduleReconnect();
+      }
     }
 
     return promise;
@@ -229,7 +241,12 @@ export abstract class ConnectionBase {
 
   // 接收 / Heartbeat / Reconnect / ...
 
-  private async handleData(data: Buffer): Promise<void> {
+  private async handleData(
+    socket: Socket,
+    data: Buffer,
+  ): Promise<void> {
+    if (this.socket !== socket) return;
+
     this.receiveBuffer = Buffer.concat([this.receiveBuffer, data,]);
 
     while (this.receiveBuffer.length > 0) {
@@ -242,7 +259,10 @@ export abstract class ConnectionBase {
           this.onError(this.toError(error)),
         );
 
-        this.socket?.destroy();
+        if (this.socket === socket) {
+          socket.destroy();
+        }
+
         return;
       }
 
@@ -261,7 +281,10 @@ export abstract class ConnectionBase {
           ),
         );
 
-        this.socket?.destroy();
+        if (this.socket === socket) {
+          socket.destroy();
+        }
+
         return;
       }
 
@@ -270,6 +293,8 @@ export abstract class ConnectionBase {
       await this.runHook(() =>
         this.onReceived(result.packet),
       );
+
+      if (this.socket !== socket) return;
     }
   }
 
@@ -278,8 +303,11 @@ export abstract class ConnectionBase {
 
     if (this.stopped || !this.isConnected) return;
 
+    const socket = this.socket; // 防止 Socket 生命週期競爭
+    if (!socket) return;
+
     this.heartbeatTimer = setTimeout(async () => {
-      if (!this.isConnected || this.stopped) return;
+      if (this.stopped || this.socket !== socket || !this.isConnected) return;
 
       try {
         await this.sendAsync(
@@ -290,11 +318,16 @@ export abstract class ConnectionBase {
           this.onError(this.toError(error)),
         );
 
-        this.socket?.destroy();
+        if (this.socket === socket) {
+          socket.destroy();
+        }
+
         return;
       }
 
-      this.scheduleHeartbeat();
+      if (this.socket === socket) {
+        this.scheduleHeartbeat();
+      }
     }, this.heartbeatInterval);
   }
 
