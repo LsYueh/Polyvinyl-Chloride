@@ -211,11 +211,12 @@ export abstract class ConnectionBase {
   // 發送資料
 
   public sendAsync(data: Buffer): Promise<void> {
-    const task = this.sendQueue.then(async () => {
-      const socket = this.socket;
+    const socket = this.socket;
 
+    const task = this.sendQueue.then(async () => {
       if (
         !socket ||
+        this.socket !== socket ||
         socket.readyState !== 'open' ||
         !this.connected
       ) {
