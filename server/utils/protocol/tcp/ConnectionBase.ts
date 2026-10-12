@@ -47,7 +47,23 @@ export abstract class ConnectionBase {
   ) {
     this.autoReconnect = options.autoReconnect ?? true;
     this.reconnectDelay = options.reconnectDelay ?? 5000;
-    this.heartbeatInterval = options.heartbeatInterval ?? 45000;
+    this.heartbeatInterval = this.getReconnectDelay(options.heartbeatInterval ?? 45000);
+  }
+
+  private getReconnectDelay(reconnectDelay: number): number {
+    const MAX_TIMER_DELAY = 2_147_483_647;
+
+    if (
+      !Number.isSafeInteger(reconnectDelay) ||
+      reconnectDelay <= 0 ||
+      reconnectDelay > MAX_TIMER_DELAY
+    ) {
+      throw new RangeError(
+        `reconnectDelay must be an integer between 1 and ${MAX_TIMER_DELAY}.`,
+      );
+    }
+
+    return reconnectDelay;
   }
 
   public get isConnected(): boolean {
@@ -307,28 +323,21 @@ export abstract class ConnectionBase {
     const socket = this.socket; // 防止 Socket 生命週期競爭
     if (!socket) return;
 
-    this.heartbeatTimer = setTimeout(async () => {
+    this.heartbeatTimer = setTimeout(() => {
       if (this.stopped || this.socket !== socket || !this.isConnected) return;
+      
+      // 先安排下一次 Heartbeat，不等待本次寫入完成。
+      this.scheduleHeartbeat();
 
-      try {
-        await this.sendAsync(
-          this.createHeartbeatPacket(),
-        );
-      } catch (error) {
-        await this.runHook(() =>
-          this.onError(this.toError(error)),
-        );
+      void this.sendAsync(this.createHeartbeatPacket()).catch(
+        async (error) => {
+          await this.runHook(() => this.onError(this.toError(error)));
 
-        if (this.socket === socket) {
-          socket.destroy();
-        }
-
-        return;
-      }
-
-      if (this.socket === socket) {
-        this.scheduleHeartbeat();
-      }
+          if (this.socket === socket) {
+            socket.destroy();
+          }
+        },
+      );
     }, this.heartbeatInterval);
   }
 
